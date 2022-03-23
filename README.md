@@ -23,6 +23,15 @@ Or install it yourself as:
 ## Usage
 
 TODO: Write usage instructions here
+```ruby
+require 'bgzrfb'
+fname = ARGV.shift
+BGZF::Reader.open(fname) do |f|
+  f.each_line do |line|
+    print line
+  end
+end
+```
 
 ## Development
 
