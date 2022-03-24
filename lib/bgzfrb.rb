@@ -17,32 +17,33 @@ module Bgzfrb
     end
 
     def initialize(fname)
-      @f = File.open(fname, "rb")
+      @fname = fname
     end
 
     def each_block
-      until @f.eof?
-        header = parse_header
-        validate_header(header)
-        extra = parse_extra(header)
-        validate_extra(extra)
-        cdata_size = extra[:BSIZE] - header[:XLEN] - 19
-        cdata = @f.read(cdata_size)
-        z = Zlib::Inflate.new(-15)
-        buf = z.inflate(cdata)
-        buf.force_encoding("ASCII")
-        crc, isize = @f.read(8).unpack("LL")
-        validate_cdata(buf, crc, isize)
-        yield buf if buf.size > 0
+      File.open(@fname, "rb") do |f|
+        until f.eof?
+          header = parse_header(f)
+          validate_header(header)
+          extra = parse_extra(header, f)
+          validate_extra(extra)
+          cdata_size = extra[:BSIZE] - header[:XLEN] - 19
+          cdata = f.read(cdata_size)
+          z = Zlib::Inflate.new(-15)
+          buf = z.inflate(cdata)
+          crc, isize = f.read(8).unpack("LL")
+          validate_cdata(buf, crc, isize)
+          buf.force_encoding("UTF-8")
+          yield buf if buf.size > 0
+        end
+        validate_eof_maker(header, extra, crc, isize)
       end
-      @f.close
-      validate_eof_maker(header, extra, crc, isize)
     end
 
     private
 
-    def parse_header
-      buf = @f.read(12)
+    def parse_header(f)
+      buf = f.read(12)
       h = buf.unpack("CCCCLCCS")
       return {
         ID1: h[0],
@@ -56,8 +57,8 @@ module Bgzfrb
       }
     end
 
-    def parse_extra(header)
-      buf = @f.read(header[:XLEN])
+    def parse_extra(header, f)
+      buf = f.read(header[:XLEN])
       extra = buf.unpack("CCSS")
       return {
         Sl1: extra[0],
