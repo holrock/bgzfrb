@@ -1,21 +1,26 @@
 # frozen_string_literal: true
 
 require_relative "bgzfrb/version"
+require 'zlib'
+require 'stringio'
 
 module Bgzfrb
-  VERSION = "0.1.0"
 
   class Error < StandardError; end
   class Reader
     def self.open(fname)
-      yield new(fname)
+      r = new(fname)
+      r.each_block do |b|
+        f = StringIO.new(b)
+        yield f
+      end
     end
 
     def initialize(fname)
       @f = File.open(fname, "rb")
     end
 
-    def each_line
+    def each_block
       until @f.eof?
         header = parse_header
         validate_header(header)
@@ -25,6 +30,7 @@ module Bgzfrb
         cdata = @f.read(cdata_size)
         z = Zlib::Inflate.new(-15)
         buf = z.inflate(cdata)
+        buf.force_encoding("ASCII")
         crc, isize = @f.read(8).unpack("LL")
         validate_cdata(buf, crc, isize)
         yield buf if buf.size > 0
